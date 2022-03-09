@@ -661,15 +661,15 @@ HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void **out)
 
 HRESULT WINAPI DllGetActivationFactory(HSTRING classid, IActivationFactory **factory)
 {
-    TRACE("classid %s, factory %p.\n", debugstr_hstring(classid), factory);
+    const WCHAR *buffer = WindowsGetStringRawBuffer(classid, NULL);
 
-    if (wcscmp(WindowsGetStringRawBuffer(classid, NULL), L"Windows.Media.SpeechSynthesis.SpeechSynthesizer"))
-    {
-        ERR("Unknown classid %s.\n", debugstr_hstring(classid));
-        return CLASS_E_CLASSNOTAVAILABLE;
-    }
+    TRACE("classid %s, factory %p.\n", debugstr_w(buffer), factory);
 
-    *factory = &windows_media_speech.IActivationFactory_iface;
-    IUnknown_AddRef(*factory);
-    return S_OK;
+    *factory = NULL;
+
+    if (!wcscmp(buffer, L"Windows.Media.SpeechSynthesis.SpeechSynthesizer"))
+        IActivationFactory_AddRef((*factory = &windows_media_speech.IActivationFactory_iface));
+
+    if (*factory) return S_OK;
+    return CLASS_E_CLASSNOTAVAILABLE;
 }
