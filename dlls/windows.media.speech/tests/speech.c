@@ -1612,6 +1612,14 @@ static void test_Recognition(void)
      * TODO: Use a loopback device together with prerecorded audio files to test the recognizer's functionality.
      */
 
+    hr = ISpeechContinuousRecognitionSession_PauseAsync(session, &action2);
+    ok(hr == S_OK, "ISpeechContinuousRecognitionSession_PauseAsync failed, hr %#lx.\n", hr);
+    await_async_void(action2, &action_handler);
+    IAsyncAction_Release(action2);
+
+    hr = ISpeechContinuousRecognitionSession_Resume(session);
+    todo_wine ok(hr == S_OK, "ISpeechContinuousRecognitionSession_Resume failed, hr %#lx.\n", hr);
+
     hr = ISpeechContinuousRecognitionSession_StopAsync(session, &action2);
     ok(hr == S_OK, "ISpeechContinuousRecognitionSession_StopAsync failed, hr %#lx.\n", hr);
 
