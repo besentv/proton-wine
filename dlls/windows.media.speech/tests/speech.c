@@ -1474,6 +1474,7 @@ static void test_Recognition(void)
     struct iterator_hstring iterator_hstring;
     struct iterable_hstring iterable_hstring;
     EventRegistrationToken token = { .value = 0 };
+    SpeechRecognizerState recog_state;
     HSTRING commands[3], hstr, tag;
     HANDLE put_thread;
     LONG ref, old_ref;
@@ -1568,6 +1569,11 @@ static void test_Recognition(void)
     ok(hr == S_OK, "ISpeechContinuousRecognitionSession_add_ResultGenerated failed, hr %#lx.\n", hr);
     ok(token.value != 0xdeadbeef, "Got unexpexted token: %#I64x.\n", token.value);
 
+    recog_state = 0xdeadbeef;
+    hr = ISpeechRecognizer2_get_State(recognizer2, &recog_state);
+    todo_wine ok(hr == S_OK, "ISpeechRecognizer2_get_State failed, hr %#lx.\n", hr);
+    todo_wine ok(recog_state == SpeechRecognizerState_Idle, "recog_state was %u.\n", recog_state);
+
     hr = ISpeechRecognizer_CompileConstraintsAsync(recognizer, &operation);
     ok(hr == S_OK, "ISpeechRecognizer_CompileConstraintsAsync failed, hr %#lx.\n", hr);
     await_async_inspectable((IAsyncOperation_IInspectable *)operation,
@@ -1608,6 +1614,11 @@ static void test_Recognition(void)
 
     IAsyncInfo_Release(info);
 
+    recog_state = 0xdeadbeef;
+    hr = ISpeechRecognizer2_get_State(recognizer2, &recog_state);
+    todo_wine ok(hr == S_OK, "ISpeechRecognizer2_get_State failed, hr %#lx.\n", hr);
+    todo_wine ok(recog_state == SpeechRecognizerState_Capturing, "recog_state was %u.\n", recog_state);
+
     /*
      * TODO: Use a loopback device together with prerecorded audio files to test the recognizer's functionality.
      */
@@ -1617,8 +1628,18 @@ static void test_Recognition(void)
     await_async_void(action2, &action_handler);
     IAsyncAction_Release(action2);
 
+    recog_state = 0xdeadbeef;
+    hr = ISpeechRecognizer2_get_State(recognizer2, &recog_state);
+    todo_wine ok(hr == S_OK, "ISpeechRecognizer2_get_State failed, hr %#lx.\n", hr);
+    todo_wine ok(recog_state == SpeechRecognizerState_Paused, "recog_state was %u.\n", recog_state);
+
     hr = ISpeechContinuousRecognitionSession_Resume(session);
     todo_wine ok(hr == S_OK, "ISpeechContinuousRecognitionSession_Resume failed, hr %#lx.\n", hr);
+
+    recog_state = 0xdeadbeef;
+    hr = ISpeechRecognizer2_get_State(recognizer2, &recog_state);
+    todo_wine ok(hr == S_OK, "ISpeechRecognizer2_get_State failed, hr %#lx.\n", hr);
+    todo_wine ok(recog_state == SpeechRecognizerState_Capturing, "recog_state was %u.\n", recog_state);
 
     hr = ISpeechContinuousRecognitionSession_StopAsync(session, &action2);
     ok(hr == S_OK, "ISpeechContinuousRecognitionSession_StopAsync failed, hr %#lx.\n", hr);
@@ -1652,7 +1673,7 @@ static void test_Recognition(void)
 
     hr = IAsyncInfo_Close(info); /* If IAsyncInfo_Close would wait for the handler to finish, the test would get stuck here. */
     ok(hr == S_OK, "IAsyncInfo_Close failed, hr %#lx.\n", hr);
-    check_async_info((IInspectable *)action2, 3, AsyncStatus_Closed, S_OK);
+    check_async_info((IInspectable *)action2, 4, AsyncStatus_Closed, S_OK);
 
     set = SetEvent(action_handler.event_block);
     ok(set == TRUE, "Event 'event_block' wasn't set.\n");
@@ -1668,6 +1689,11 @@ static void test_Recognition(void)
     IAsyncAction_Release(action2);
 skip_action:
     IAsyncAction_Release(action);
+
+    recog_state = 0xdeadbeef;
+    hr = ISpeechRecognizer2_get_State(recognizer2, &recog_state);
+    todo_wine ok(hr == S_OK, "ISpeechRecognizer2_get_State failed, hr %#lx.\n", hr);
+    todo_wine ok(recog_state == SpeechRecognizerState_Idle, "recog_state was %u.\n", recog_state);
 
     hr = ISpeechContinuousRecognitionSession_remove_ResultGenerated(session, token);
     ok(hr == S_OK, "ISpeechContinuousRecognitionSession_remove_ResultGenerated failed, hr %#lx.\n", hr);
