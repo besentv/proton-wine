@@ -1592,6 +1592,11 @@ static void test_Recognition(void)
 
     await_async_void(action, &action_handler);
 
+    action2 = (void *)0xdeadbeef;
+    hr = ISpeechContinuousRecognitionSession_StartAsync(session, &action2);
+    ok(hr == 0x80131509, "ISpeechContinuousRecognitionSession_StartAsync failed, hr %#lx.\n", hr);
+    ok(action2 == (void *)0xdeadbeef, "action2 was %p.\n", action2);
+
     hr = IAsyncAction_QueryInterface(action, &IID_IAsyncInfo, (void **)&info);
     ok(hr == S_OK, "IAsyncAction_QueryInterface failed, hr %#lx.\n", hr);
     check_async_info((IInspectable *)action, 1, Completed, S_OK);
@@ -1634,7 +1639,7 @@ static void test_Recognition(void)
     todo_wine ok(recog_state == SpeechRecognizerState_Paused, "recog_state was %u.\n", recog_state);
 
     hr = ISpeechContinuousRecognitionSession_Resume(session);
-    todo_wine ok(hr == S_OK, "ISpeechContinuousRecognitionSession_Resume failed, hr %#lx.\n", hr);
+    ok(hr == S_OK, "ISpeechContinuousRecognitionSession_Resume failed, hr %#lx.\n", hr);
 
     recog_state = 0xdeadbeef;
     hr = ISpeechRecognizer2_get_State(recognizer2, &recog_state);
