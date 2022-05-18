@@ -20,9 +20,35 @@
 #include "initguid.h"
 #include "private.h"
 
+#include "winternl.h"
+
 #include "wine/debug.h"
+#include "wine/unixlib.h"
+
+#include "unixlib.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(speech);
+
+unixlib_handle_t vosk_handle = 0;
+
+BOOL WINAPI DllMain(HINSTANCE dll, DWORD reason, void *reserved)
+{
+    NTSTATUS status;
+    TRACE("dll %p, reason %lu, reserved %p.\n", dll, reason, reserved);
+
+    switch (reason)
+    {
+        case DLL_PROCESS_ATTACH:
+            if ((status = NtQueryVirtualMemory(GetCurrentProcess(), dll, MemoryWineUnixFuncs,
+                                              &vosk_handle, sizeof(vosk_handle), NULL)))
+                {
+                    WARN("Querying for Unixlib failed with status %lu.\n", status);
+                    return FALSE;
+                }
+            break;
+    }
+    return TRUE;
+}
 
 HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void **out)
 {
