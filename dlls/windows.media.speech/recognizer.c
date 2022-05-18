@@ -188,12 +188,14 @@ static DWORD CALLBACK session_thread_cb( void *arg )
     ISpeechContinuousRecognitionSession *iface = arg;
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession(iface);
     BOOLEAN running, paused = FALSE;
-    UINT32 frame_count, frames_available;
-    BYTE *audio_buf;
+    UINT32 frame_count, frames_available, tmp_buf_offset = 0;
+    BYTE *audio_buf, *tmp_buf;
     DWORD flags;
 
     IAudioClient_GetBufferSize(impl->audio_client, &frame_count);
     FIXME("frame_count %u.\n", frame_count);
+
+    tmp_buf = malloc(sizeof(*tmp_buf) * frame_count * 2); /* *2 because our audio frames have 16bit depth. */
 
     EnterCriticalSection(&impl->cs);
     running = impl->session_running;
@@ -219,12 +221,20 @@ static DWORD CALLBACK session_thread_cb( void *arg )
         if (WaitForSingleObject(impl->audio_buf_event, 500) != WAIT_OBJECT_0)
             continue;
 
-        while (IAudioCaptureClient_GetBuffer(impl->capture_client, &audio_buf, &frames_available, &flags, NULL, NULL) == S_OK)
+        while (IAudioCaptureClient_GetBuffer(impl->capture_client, &audio_buf, &frames_available, &flags, NULL, NULL) == S_OK
+               && tmp_buf_offset < (frame_count * 2))
         {
-            /* TODO: Send mic data to recognizer. */
+            memcpy(tmp_buf + tmp_buf_offset, audio_buf, frames_available * 2);
+            tmp_buf_offset += (frames_available * 2); /* *2 because our audio frames have 16bit depth. */
+
             IAudioCaptureClient_ReleaseBuffer(impl->capture_client, frames_available);
         }
+
+        /* TODO: Send mic data to recognizer. */
+        tmp_buf_offset = 0;
     }
+
+    free(tmp_buf);
 
     return 0;
 }
