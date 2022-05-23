@@ -65,6 +65,8 @@ AC_ARG_WITH(unwind,    AS_HELP_STRING([--without-unwind],[do not use the libunwi
 AC_ARG_WITH(usb,       AS_HELP_STRING([--without-usb],[do not use the libusb library]))
 AC_ARG_WITH(v4l2,      AS_HELP_STRING([--without-v4l2],[do not use v4l2 (video capture)]))
 AC_ARG_WITH(vkd3d,     AS_HELP_STRING([--without-vkd3d],[do not use vkd3d (Direct3D 12 support)]))
+AC_ARG_WITH(vosk,      AS_HELP_STRING([--without-vosk],[do not use Vosk]),
+            [if test "x$withval" = "xno"; then ac_cv_header_vosk_api_h=no; fi])
 AC_ARG_WITH(vulkan,    AS_HELP_STRING([--without-vulkan],[do not use Vulkan]))
 AC_ARG_WITH(xcomposite,AS_HELP_STRING([--without-xcomposite],[do not use the Xcomposite extension]),
             [if test "x$withval" = "xno"; then ac_cv_header_X11_extensions_Xcomposite_h=no; fi])
@@ -508,7 +510,8 @@ AC_CHECK_HEADERS(\
 	syscall.h \
 	utime.h \
 	valgrind/memcheck.h \
-	valgrind/valgrind.h
+	valgrind/valgrind.h \
+	vosk_api.h
 )
 WINE_HEADER_MAJOR()
 AC_HEADER_STAT()
@@ -1772,6 +1775,17 @@ if test "x$enable_winealsa_drv$enable_winecoreaudio_drv$enable_winepulse_drv$ena
 then
     WINE_WARNING([No sound system was found. Windows applications will be silent.])
 fi
+
+dnl **** Check for Vosk ****
+if test "$ac_cv_header_vosk_api_h" = "yes"
+then
+    WINE_CHECK_SONAME(vosk,vosk_recognizer_new,[AC_SUBST(VOSK_LIBS,"-lvosk")
+                      ac_cv_lib_vosk=yes
+                      AC_DEFINE_UNQUOTED(HAVE_VOSK,1,[Define to 1 if Vosk is available])],,)
+fi
+WINE_NOTICE_WITH(vosk,[test "x$ac_cv_lib_vosk" != xyes],
+                 [libvosk ${notice_platform}development files not found (or too old), Vosk aka speech recognition won't be supported.],
+                 [enable_vosk])
 
 dnl *** Check for Vulkan ***
 if test "x$with_vulkan" != "xno"
