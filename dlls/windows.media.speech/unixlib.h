@@ -18,6 +18,13 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "wine/unixlib.h"
+
+enum vosk_funcs
+{
+    vosk_process_attach
+};
+
 extern unixlib_handle_t vosk_handle;
 
 #define VOSK_CALL(func, params) __wine_unix_call(vosk_handle, vosk_ ## func, params)

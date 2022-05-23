@@ -45,6 +45,7 @@ BOOL WINAPI DllMain(HINSTANCE dll, DWORD reason, void *reserved)
                     WARN("Querying for Unixlib failed with status %lu.\n", status);
                     return FALSE;
                 }
+            if ((status = VOSK_CALL(process_attach, NULL))) WARN("Initializing unixlib failed with status %lx.\n", status);
             break;
     }
     return TRUE;

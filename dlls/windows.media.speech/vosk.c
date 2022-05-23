@@ -22,8 +22,61 @@
 #pragma makedep unix
 #endif
 
+#include "config.h"
+
+#include <stdarg.h>
+#include <dlfcn.h>
+
+#ifdef HAVE_VOSK_API_H
+#include <vosk_api.h>
+#endif /* HAVE_VOSK_API_H */
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "winerror.h"
 #include "winternl.h"
 
-#include "wine/unixlib.h"
+#include "wine/debug.h"
 
 #include "unixlib.h"
+
+#ifdef HAVE_VOSK_API_H
+
+WINE_DEFAULT_DEBUG_CHANNEL( vosk );
+
+#ifdef SONAME_LIBVOSK
+static void *libvosk_handle;
+#endif /* SONAME_LIBVOSK */
+
+static NTSTATUS process_attach( void *args )
+{
+    TRACE( "args %p.\n", args );
+
+#ifdef SONAME_LIBVOSK
+    if (!(libvosk_handle = dlopen( SONAME_LIBVOSK, RTLD_NOW )))
+    {
+        WARN( "Failed to load library %s, reason %s.\n", SONAME_LIBVOSK, dlerror() );
+        return STATUS_DLL_NOT_FOUND;
+    }
+
+    return STATUS_SUCCESS;
+#else /* SONAME_LIBVOSK */
+    return STATUS_NOT_SUPPORTED;
+#endif /* SONAME_LIBVOSK */
+}
+
+#else /* HAVE_VOSK_API_H */
+
+static NTSTATUS process_attach( void *args ) { return STATUS_NOT_SUPPORTED; }
+
+#endif /* HAVE_VOSK_API_H */
+
+unixlib_entry_t __wine_unix_call_funcs[] =
+{
+    process_attach
+};
+
+unixlib_entry_t __wine_unix_call_wow64_funcs[] =
+{
+    process_attach
+};
