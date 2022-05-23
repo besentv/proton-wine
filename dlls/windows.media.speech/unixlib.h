@@ -20,9 +20,25 @@
 
 #include "wine/unixlib.h"
 
+typedef UINT64 vosk_instance;
+
+struct vosk_create_params
+{
+    vosk_instance *instance;
+    const char *model_path;
+    float sample_rate;
+};
+
+struct vosk_release_params
+{
+    vosk_instance instance;
+};
+
 enum vosk_funcs
 {
-    vosk_process_attach
+    vosk_process_attach,
+    vosk_create,
+    vosk_release
 };
 
 extern unixlib_handle_t vosk_handle;

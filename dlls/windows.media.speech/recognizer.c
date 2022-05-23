@@ -25,6 +25,8 @@
 
 #include "wine/debug.h"
 
+#include "unixlib.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(speech);
 
 /*
@@ -166,6 +168,8 @@ struct session
     IAudioClient *audio_client;
     IAudioCaptureClient *capture_client;
 
+    vosk_instance vosk_instance;
+
     HANDLE session_thread;
     HANDLE session_paused_event, session_resume_event, audio_buf_event;
     BOOLEAN session_running, session_paused;
@@ -287,6 +291,7 @@ static ULONG WINAPI session_Release( ISpeechContinuousRecognitionSession *iface 
 
     if (!ref)
     {
+        struct vosk_release_params vosk_release_params;
         BOOLEAN running = FALSE;
 
         EnterCriticalSection(&impl->cs);
@@ -299,9 +304,14 @@ static ULONG WINAPI session_Release( ISpeechContinuousRecognitionSession *iface 
         typed_event_handlers_clear(&impl->result_handlers);
         IAudioCaptureClient_Release(impl->capture_client);
         IAudioClient_Release(impl->audio_client);
+
+        vosk_release_params.instance = impl->vosk_instance;
+        VOSK_CALL(release, &vosk_release_params);
+
         CloseHandle(impl->session_paused_event);
         CloseHandle(impl->session_resume_event);
         DeleteCriticalSection(&impl->cs);
+
         free(impl);
     }
 
@@ -1009,6 +1019,7 @@ static HRESULT WINAPI recognizer_factory_Create( ISpeechRecognizerFactory *iface
 {
     struct recognizer *impl;
     struct session *session;
+    struct vosk_create_params vosk_create_params;
     struct vector_iids constraints_iids =
     {
         .iterable = &IID_IIterable_ISpeechRecognitionConstraint,
@@ -1049,6 +1060,13 @@ static HRESULT WINAPI recognizer_factory_Create( ISpeechRecognizerFactory *iface
     session->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": recognition_session.cs");
 
     if (FAILED(hr = init_audio_capture(&session->audio_client, &session->capture_client, session->audio_buf_event)))
+        goto error;
+
+    vosk_create_params.model_path = getenv("PROTON_VOSK_MODEL_PATH");
+    vosk_create_params.sample_rate = 16000.f;
+    vosk_create_params.instance = &session->vosk_instance;
+
+    if (FAILED(hr = HRESULT_FROM_NT(VOSK_CALL(create, &vosk_create_params))))
         goto error;
 
     impl->ISpeechRecognizer_iface.lpVtbl = &speech_recognizer_vtbl;
