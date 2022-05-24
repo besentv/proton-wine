@@ -42,13 +42,20 @@ struct recognize_audio_params
     INT32 status;
 };
 
+struct get_result_params
+{
+    vosk_instance instance;
+    char *buf;
+    UINT32 buf_len;
+};
 
 enum vosk_funcs
 {
     vosk_process_attach,
     vosk_create,
     vosk_release,
-    vosk_recognize_audio
+    vosk_recognize_audio,
+    vosk_get_result
 };
 
 extern unixlib_handle_t vosk_handle;

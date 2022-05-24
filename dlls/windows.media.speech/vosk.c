@@ -50,6 +50,8 @@ MAKE_FUNCPTR( vosk_recognizer_new )
 MAKE_FUNCPTR( vosk_model_free )
 MAKE_FUNCPTR( vosk_recognizer_free )
 MAKE_FUNCPTR( vosk_recognizer_accept_waveform )
+MAKE_FUNCPTR( vosk_recognizer_final_result );
+MAKE_FUNCPTR( vosk_recognizer_reset );
 #undef MAKE_FUNCPTR
 
 #ifdef SONAME_LIBVOSK
@@ -78,6 +80,8 @@ static NTSTATUS process_attach( void *args )
     LOAD_FUNCPTR( vosk_model_free );
     LOAD_FUNCPTR( vosk_recognizer_free );
     LOAD_FUNCPTR( vosk_recognizer_accept_waveform );
+    LOAD_FUNCPTR( vosk_recognizer_final_result );
+    LOAD_FUNCPTR( vosk_recognizer_reset );
 #undef LOAD_FUNCPTR
     return STATUS_SUCCESS;
 error:
@@ -157,6 +161,35 @@ static NTSTATUS recognize_audio( void *args )
     return STATUS_SUCCESS;
 }
 
+char *last_result = NULL;
+
+static NTSTATUS get_result( void* args )
+{
+    struct get_result_params *params = args;
+    VoskRecognizer *recognizer = from_vosk_instance( params->instance );
+
+    TRACE("args %p.\n", args);
+
+    if (!pvosk_recognizer_final_result || !pvosk_recognizer_reset || !recognizer)
+        return STATUS_UNSUCCESSFUL;
+    
+    if (!last_result)
+        last_result = (char *)pvosk_recognizer_final_result( recognizer );
+
+    TRACE( "last_result %s.\n", debugstr_a( last_result ) );
+
+    if (params->buf_len >= strlen( last_result ) + 1)
+    {
+        memcpy( params->buf, last_result, strlen(last_result) + 1 );
+        pvosk_recognizer_reset( recognizer );
+        last_result = NULL;
+        
+        return STATUS_SUCCESS;
+    }
+
+    params->buf_len = strlen( last_result ) + 1;
+    return STATUS_BUFFER_TOO_SMALL;
+}
 
 #else /* HAVE_VOSK_API_H */
 
@@ -164,6 +197,7 @@ static NTSTATUS process_attach( void *args ) { return STATUS_NOT_SUPPORTED; }
 static NTSTATUS create( void *args ) { return STATUS_NOT_SUPPORTED; }
 static NTSTATUS release( void *args ) { return STATUS_NOT_SUPPORTED; }
 static NTSTATUS recognize_audio( void *args ) { return STATUS_NOT_SUPPORTED; }
+static NTSTATUS get_result( void* args ) { return STATUS_NOT_SUPPORTED; }
 
 #endif /* HAVE_VOSK_API_H */
 
@@ -172,7 +206,8 @@ unixlib_entry_t __wine_unix_call_funcs[] =
     process_attach,
     create,
     release,
-    recognize_audio
+    recognize_audio,
+    get_result
 };
 
 unixlib_entry_t __wine_unix_call_wow64_funcs[] =
@@ -180,5 +215,6 @@ unixlib_entry_t __wine_unix_call_wow64_funcs[] =
     process_attach,
     create,
     release,
-    recognize_audio
+    recognize_audio,
+    get_result
 };

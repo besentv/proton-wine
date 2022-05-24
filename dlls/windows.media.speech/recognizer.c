@@ -192,6 +192,7 @@ static DWORD CALLBACK session_thread_cb( void *arg )
     ISpeechContinuousRecognitionSession *iface = arg;
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession(iface);
     struct recognize_audio_params recog_params;
+    struct get_result_params result_params;
     BOOLEAN running, paused = FALSE;
     UINT32 frame_count, frames_available, tmp_buf_offset = 0;
     BYTE *audio_buf, *tmp_buf;
@@ -249,7 +250,18 @@ static DWORD CALLBACK session_thread_cb( void *arg )
 
         TRACE("Vosk recognized something!\n");
 
-        /* TODO: Get result from Vosk. */
+        result_params.instance = impl->vosk_instance;
+        result_params.buf = NULL;
+        result_params.buf_len = 1000;
+        do
+        {
+            free(result_params.buf);
+            result_params.buf = malloc(result_params.buf_len * sizeof(*result_params.buf));
+        } while (VOSK_CALL(get_result, &result_params) == STATUS_BUFFER_TOO_SMALL);
+
+        TRACE("Got \n%s\n", result_params.buf);
+
+        /* TODO: Compare recognized text to available options. */
     }
 
     free(tmp_buf);
