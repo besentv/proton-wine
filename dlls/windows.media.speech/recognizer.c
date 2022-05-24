@@ -191,6 +191,7 @@ static DWORD CALLBACK session_thread_cb( void *arg )
 {
     ISpeechContinuousRecognitionSession *iface = arg;
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession(iface);
+    struct recognize_audio_params recog_params;
     BOOLEAN running, paused = FALSE;
     UINT32 frame_count, frames_available, tmp_buf_offset = 0;
     BYTE *audio_buf, *tmp_buf;
@@ -234,8 +235,21 @@ static DWORD CALLBACK session_thread_cb( void *arg )
             IAudioCaptureClient_ReleaseBuffer(impl->capture_client, frames_available);
         }
 
-        /* TODO: Send mic data to recognizer. */
+        recog_params.instance = impl->vosk_instance;
+        recog_params.samples = tmp_buf;
+        recog_params.samples_size = tmp_buf_offset;
+
         tmp_buf_offset = 0;
+
+        if (NT_ERROR(VOSK_CALL(recognize_audio, &recog_params)))
+            continue;
+
+        if (recog_params.status < 1)
+            continue;
+
+        TRACE("Vosk recognized something!\n");
+
+        /* TODO: Get result from Vosk. */
     }
 
     free(tmp_buf);

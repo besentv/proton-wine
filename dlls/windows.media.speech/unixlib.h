@@ -34,11 +34,21 @@ struct vosk_release_params
     vosk_instance instance;
 };
 
+struct recognize_audio_params
+{
+    vosk_instance instance;
+    const BYTE *samples;
+    UINT32 samples_size;
+    INT32 status;
+};
+
+
 enum vosk_funcs
 {
     vosk_process_attach,
     vosk_create,
-    vosk_release
+    vosk_release,
+    vosk_recognize_audio
 };
 
 extern unixlib_handle_t vosk_handle;

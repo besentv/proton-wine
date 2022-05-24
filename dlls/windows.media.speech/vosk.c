@@ -49,6 +49,7 @@ MAKE_FUNCPTR( vosk_model_new )
 MAKE_FUNCPTR( vosk_recognizer_new )
 MAKE_FUNCPTR( vosk_model_free )
 MAKE_FUNCPTR( vosk_recognizer_free )
+MAKE_FUNCPTR( vosk_recognizer_accept_waveform )
 #undef MAKE_FUNCPTR
 
 #ifdef SONAME_LIBVOSK
@@ -76,6 +77,7 @@ static NTSTATUS process_attach( void *args )
     LOAD_FUNCPTR( vosk_recognizer_new );
     LOAD_FUNCPTR( vosk_model_free );
     LOAD_FUNCPTR( vosk_recognizer_free );
+    LOAD_FUNCPTR( vosk_recognizer_accept_waveform );
 #undef LOAD_FUNCPTR
     return STATUS_SUCCESS;
 error:
@@ -139,11 +141,29 @@ static NTSTATUS release( void *args )
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS recognize_audio( void *args )
+{
+    struct recognize_audio_params *params = args;
+    VoskRecognizer *recognizer = from_vosk_instance( params->instance );
+
+    if (!pvosk_recognizer_accept_waveform || !recognizer)
+        return STATUS_UNSUCCESSFUL;
+
+    if (params->samples && params->samples_size > 0)
+        params->status = pvosk_recognizer_accept_waveform( recognizer, (const char *)params->samples, params->samples_size );
+    else
+        params->status = -1; /* -1 == vosk exception */
+
+    return STATUS_SUCCESS;
+}
+
+
 #else /* HAVE_VOSK_API_H */
 
 static NTSTATUS process_attach( void *args ) { return STATUS_NOT_SUPPORTED; }
 static NTSTATUS create( void *args ) { return STATUS_NOT_SUPPORTED; }
 static NTSTATUS release( void *args ) { return STATUS_NOT_SUPPORTED; }
+static NTSTATUS recognize_audio( void *args ) { return STATUS_NOT_SUPPORTED; }
 
 #endif /* HAVE_VOSK_API_H */
 
@@ -151,12 +171,14 @@ unixlib_entry_t __wine_unix_call_funcs[] =
 {
     process_attach,
     create,
-    release
+    release,
+    recognize_audio
 };
 
 unixlib_entry_t __wine_unix_call_wow64_funcs[] =
 {
     process_attach,
     create,
-    release
+    release,
+    recognize_audio
 };
