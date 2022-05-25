@@ -162,6 +162,8 @@ struct session
     ISpeechContinuousRecognitionSession ISpeechContinuousRecognitionSession_iface;
     LONG ref;
 
+    IVectorView_IInspectable *constraints;
+
     struct list completed_handlers;
     struct list result_handlers;
 
@@ -683,6 +685,13 @@ static HRESULT WINAPI recognizer_get_UIOptions( ISpeechRecognizer *iface, ISpeec
 
 static HRESULT WINAPI compile_callback( IInspectable *invoker, IInspectable **result )
 {
+    struct recognizer *impl = impl_from_ISpeechRecognizer((ISpeechRecognizer *)invoker);
+    struct session *session = impl_from_ISpeechContinuousRecognitionSession(impl->session);
+
+    if (session->constraints) IVectorView_IInspectable_Release(session->constraints);
+
+    IVector_IInspectable_GetView((IVector_IInspectable *)impl->constraints, &session->constraints);
+    
     return compilation_result_create(SpeechRecognitionResultStatus_Success, (ISpeechRecognitionCompilationResult **) result);
 }
 
@@ -691,7 +700,7 @@ static HRESULT WINAPI recognizer_CompileConstraintsAsync( ISpeechRecognizer *ifa
 {
     IAsyncOperation_IInspectable **value = (IAsyncOperation_IInspectable **)operation;
     FIXME("iface %p, operation %p semi-stub!\n", iface, operation);
-    return async_operation_inspectable_create(&IID_IAsyncOperation_SpeechRecognitionCompilationResult, NULL, compile_callback, value);
+    return async_operation_inspectable_create(&IID_IAsyncOperation_SpeechRecognitionCompilationResult, (IInspectable *)iface, compile_callback, value);
 }
 
 static HRESULT WINAPI recognizer_RecognizeAsync( ISpeechRecognizer *iface,
