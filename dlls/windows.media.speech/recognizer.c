@@ -20,6 +20,8 @@
 #include "private.h"
 #include "initguid.h"
 
+#include <wchar.h>
+
 #include "audioclient.h"
 #include "mmdeviceapi.h"
 
@@ -191,13 +193,19 @@ static inline struct session *impl_from_ISpeechContinuousRecognitionSession( ISp
 
 static DWORD CALLBACK session_thread_cb( void *arg )
 {
+    const char *delim = "\"";
     ISpeechContinuousRecognitionSession *iface = arg;
+    IIterable_IInspectable *iterable = NULL;
+    IIterator_IInspectable *iterator = NULL;
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession(iface);
     struct recognize_audio_params recog_params;
     struct get_result_params result_params;
     BOOLEAN running, paused = FALSE;
-    UINT32 frame_count, frames_available, tmp_buf_offset = 0;
+    BOOL available = FALSE;
+    UINT32 frame_count, frames_available, tmp_buf_offset = 0, i;
     BYTE *audio_buf, *tmp_buf;
+    WCHAR *recg_text;
+    char *str, *save_ptr;
     DWORD flags;
 
     IAudioClient_GetBufferSize(impl->audio_client, &frame_count);
@@ -208,6 +216,9 @@ static DWORD CALLBACK session_thread_cb( void *arg )
     EnterCriticalSection(&impl->cs);
     running = impl->session_running;
     LeaveCriticalSection(&impl->cs);
+
+    TRACE("constraints %p\n", impl->constraints);
+    IVectorView_IInspectable_QueryInterface(impl->constraints, &IID_IIterable_ISpeechRecognitionConstraint, (void **)&iterable);
 
     while (running)
     {
@@ -263,9 +274,75 @@ static DWORD CALLBACK session_thread_cb( void *arg )
 
         TRACE("Got \n%s\n", result_params.buf);
 
-        /* TODO: Compare recognized text to available options. */
+        for (i = 0, str = strtok_s(result_params.buf, delim, &save_ptr); i < 3 && str != NULL; i++, str = strtok_s(NULL, delim, &save_ptr))
+        {}
+
+        if (str == NULL || !strcmp(str, "\n}"))
+            continue;
+
+        recg_text = calloc(strlen(str) + 1, sizeof(WCHAR));
+        MultiByteToWideChar(CP_UTF8, 0, str, -1, recg_text, strlen(str) + 1);
+
+        IIterable_IInspectable_First(iterable, &iterator);
+        for (IIterator_IInspectable_get_HasCurrent(iterator, &available); available; IIterator_IInspectable_MoveNext(iterator, &available))
+        {
+            ISpeechRecognitionListConstraint *list_constraint = NULL;
+            ISpeechRecognitionConstraint *constraint = NULL;
+            IVector_HSTRING *commands = NULL;
+            IIterable_HSTRING *commands_iterable;
+            IIterator_HSTRING *commands_iterator;
+            BOOL available2 = FALSE, has_command = FALSE;
+
+            IIterator_IInspectable_get_Current(iterator, (IInspectable **)&constraint);
+            ISpeechRecognitionConstraint_QueryInterface(constraint, &IID_ISpeechRecognitionListConstraint, (void**)&list_constraint);
+            ISpeechRecognitionListConstraint_get_Commands(list_constraint, &commands);
+            ISpeechRecognitionListConstraint_Release(list_constraint);
+            IVector_HSTRING_QueryInterface(commands, &IID_IIterable_HSTRING, (void **)&commands_iterable);
+            IIterable_HSTRING_First(commands_iterable, &commands_iterator);
+            IIterable_HSTRING_Release(commands_iterable);
+
+            for (IIterator_HSTRING_get_HasCurrent(commands_iterator, &available2); available2; IIterator_HSTRING_MoveNext(commands_iterator, &available2))
+            {
+                HSTRING hstr;
+                const WCHAR *cmd_string;
+                WCHAR *cmd_string_lwr;
+
+                IIterator_HSTRING_get_Current(commands_iterator, &hstr);
+                cmd_string = WindowsGetStringRawBuffer(hstr, NULL);
+                cmd_string_lwr = wcsdup(cmd_string);
+                WindowsDeleteString(hstr);
+
+                wcslwr(cmd_string_lwr);
+                wcslwr(recg_text);
+
+                TRACE("Comparing cmd_string_lwr %s to recg_text %s.\n", debugstr_w(cmd_string_lwr), debugstr_w(recg_text));
+
+                if (!wcscmp(recg_text, cmd_string_lwr))
+                {
+                    has_command = TRUE;
+                    free(cmd_string_lwr);
+                    break;
+                }
+
+                free(cmd_string_lwr);
+            }
+
+            IIterator_HSTRING_Release(commands_iterator);
+
+            if (has_command)
+            {
+                TRACE("constraint %p has recg_text %s.\n", constraint, debugstr_w(recg_text));
+                /* TODO: Send event. */
+            }
+
+            ISpeechRecognitionConstraint_Release(constraint);
+        }
+
+        free(recg_text);
+        IIterator_IInspectable_Release(iterator);
     }
 
+    IIterable_IInspectable_Release(iterable);
     free(tmp_buf);
 
     return 0;
@@ -449,6 +526,8 @@ static HRESULT WINAPI session_CancelAsync( ISpeechContinuousRecognitionSession *
 static HRESULT WINAPI pause_callback( IInspectable *invoker )
 {
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession((ISpeechContinuousRecognitionSession *)invoker);
+
+    TRACE("invoker %p\n", invoker);
 
     WaitForSingleObject(impl->session_paused_event, INFINITE);
     return S_OK;
