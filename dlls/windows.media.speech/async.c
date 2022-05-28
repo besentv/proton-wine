@@ -21,7 +21,7 @@
 
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(speech);
+WINE_DEFAULT_DEBUG_CHANNEL(async);
 
 #define Closed 4
 #define HANDLER_NOT_SET ((void *)~(ULONG_PTR)0)
