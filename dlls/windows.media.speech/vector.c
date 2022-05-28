@@ -21,7 +21,7 @@
 
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(speech);
+WINE_DEFAULT_DEBUG_CHANNEL(vector);
 
 /*
  *
